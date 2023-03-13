@@ -63,5 +63,39 @@ contract MiniswapPair is IMiniswapPair, MiniswapERC20 {
         token0 = _token0;
         token1 = _token1;
     }
+
+    function _update(uint balance0, uint balance1, uint112 _reserve0, uint112 _reserve1) private {
+				// 2진수 -1은 나타낼 수 있는 모든 수가 1이다. 그러므로 uint112(-1)은 2진수에서 112개의 1이 나열되어 있는 것이다.
+				// 그런데 solidity는 음수를 지원하지 않기 때문에 해당 숫자는 -1이 아닌 양수로 취급되고
+				// 결국 uint112(-1)은 112bit에서 나타낼 수 있는 가장 큰 수를 의미하게 된다.
+				// 이를 통해 require에서는 overflow를 확인할 수 있게 된다.
+        require(balance0 <= uint112(-1) && balance1 <= uint112(-1), 'UniswapV2: OVERFLOW');
+
+				// 블록의 timestamp를 uint32에 맞추어 저장해준다.
+        uint32 blockTimestamp = uint32(block.timestamp % 2**32);
+
+				// timeElapsed는 경과된 시간을 의미한다. blockTimestamp는 블록이 변경될 때만 바뀌기 때문에
+				// 경과된 시간이 0인지 아닌지를 확인하면 블록의 변경 여부를 알 수 있다.
+        uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
+        if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
+
+						// UQ112.112는 정수부분에 112bits, 소수부분에 112bits를 저장하는 자료형이다.
+						// 이러한 성질을 이용하여 현재 토큰 가격의 정수, 소수를 224bits에 담고, 32bits의 timeElapsed를 담으면 256bits의 data가 생성된다.
+						// EVM에서는 기본적으로 32bytes 단위로 읽기, 쓰기 작업을 진행하기 때문에 data를 이렇게 다루면
+						// 읽기, 쓰기 작업을 최소화하여 가스 비용을 줄일 수 있다.
+					
+						// 해당 데이터는 각각 두 토큰의 현재 가격(a토큰가격 / b토큰, b토큰가격 / a토큰)과 해당 시점의 timestamp 정보를 담고 있기 때문에
+						// 이를 활용하여 블록 변경 이전 각 토큰의 가격 및 시간정보를 확인하고 TWAP 정보를 적용할 수 있게 된다.
+            price0CumulativeLast += uint(UQ112x112.encode(_reserve1).uqdiv(_reserve0)) * timeElapsed;
+            price1CumulativeLast += uint(UQ112x112.encode(_reserve0).uqdiv(_reserve1)) * timeElapsed;
+        }
+
+				// 아래에서는 연산 후 토큰의 양과 시간을 업데이트 해준다.
+				// 이 때 블록이 달라진다면 blockTimestampLast가 업데이트 될 것이고, 그렇지 않다면 바뀌지 않게 된다.
+        reserve0 = uint112(balance0);
+        reserve1 = uint112(balance1);
+        blockTimestampLast = blockTimestamp;
+        emit Sync(reserve0, reserve1);
+    }
 }
 
