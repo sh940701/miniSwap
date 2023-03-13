@@ -7,7 +7,7 @@ contract MiniswapPair is IMiniswapPair, MiniswapERC20 {
     // 112x112는 TWAP을 위한 data 저장에 사용된다.
     using UQ112x112 for uint224;
 
-    // pair 컨트랙트를 배포한 factory 함수
+    // pair 컨트랙트를 배포한 factory 컨트랙트의 주소값
     address public factory;
     // initialize() 함수로 생성과 동시에 초기화된 토큰 주소값
     address public token0;
@@ -48,7 +48,20 @@ contract MiniswapPair is IMiniswapPair, MiniswapERC20 {
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(bytes4(keccak256(bytes("transfer(address,uint256)")))), to, value);
         // 이 때 각 ERC20 토큰의 transfer 구조가 다르기때문에, false인 경우, success && 아무것도 오지 않는 경우, true && 반환 데이터가 false인 경우를 모두 고려하여
         // 해당되지 않는 경우에만 전송에 성공한 것으로 간주한다.
+        // 출처: https://ethereum.stackexchange.com/questions/137882/why-does-uniswap-v2-use-safetransfer-to-transfer-tokens
         require(success && (data.length == 0 || abi.decode(data, (bool))), "Tx Failed");
+    }
+
+    constructor() public {
+        // pair 컨트랙트를 배포한 factory 컨트랙트의 주소값을 초기화 해준다.
+        factory = msg.sender;
+    }
+
+    // pair 컨트랙트 배포시 실행되어 token0, token1의 주소값을 초기화해주는 함수
+    function initialize(address _token0, address _token1) external {
+        require(msg.sender == factory, "Pair contract only can deployed by factory contract");
+        token0 = _token0;
+        token1 = _token1;
     }
 }
 
