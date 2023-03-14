@@ -105,7 +105,7 @@ contract MiniswapPair is IMiniswapPair, MiniswapERC20 {
     uint balance0 = IERC20(token0).balanceOf(address(this));
     uint balance1 = IERC20(token1).balanceOf(address(this));
 
-    // 실제 토큰양과 자료구조의 토큰양의 차이가 현재 풀에 입금된 
+    // 실제 토큰 양과 자료구조의 토큰양의 차이가 현재 풀에 입금된 토큰의 양이다.
     uint amount0 = balance0.sub(_reserve0);
     uint amount1 = valance1.sub(_reserve1);
 
@@ -117,9 +117,32 @@ contract MiniswapPair is IMiniswapPair, MiniswapERC20 {
       liquidity = Math.sqrt(amount0.mul(amount1)).sub(10**3);
       _mint(adress(0), 10**3);
     } else {
-      // 설명넣기
-      liquidity = Math.min(amount0.mul(_totalSUpply) / _reserve0, amount1.mul(_totalSupply));
+      // 이미 풀이 존재할 때, liquidity는 각 토큰의 새로 공급한 양 / 기존 보유량 * 총 공급량 중 작은값이 된다.
+      liquidity = Math.min(amount0.mul(_totalSupply) / _reserve0, amount1.mul(_totalSupply));
     }
+    require(liquidity > 0, "liquidity can not be Zero");
+    // to 주소에게 liquidity만큼의 토큰을 발급해준다.
+    _mint(to, liquidity);
+
+    // 현재 pair 컨트랙트의 토큰 보유량을 업데이트해준다.
+    _update(balance0, balance1, _reserve0, _reserve1);
+    emit Mint(msg.sender, amount0, amount1);
+  }
+
+  function burn(address to) external lock returns (uint amount0, uint amount1) {
+    (uint112 _reserve0, uint112 _reserve1,) = getReserves();
+    address _token0 = token0;
+    address _token1 = token1;
+
+    uint balance0 = IERC20(_token0).balanceOf(address(this));
+    uint balance1 = IERC20(_token1).balanceOf(address(this));
+    uint liquidity = balanceOf[address(this)];
+
+    uint _totalSupply = totalSupply;
+    amount0 = liquidity.mul(balance0) / _totalSupply;
+    amount1 = liquidity.mul(balance1) / _totalSupply;
+    require(amount0 > 0 && amount1 > 0);
+
   }
 }
 
