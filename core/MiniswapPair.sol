@@ -143,6 +143,51 @@ contract MiniswapPair is IMiniswapPair, MiniswapERC20 {
     amount1 = liquidity.mul(balance1) / _totalSupply;
     require(amount0 > 0 && amount1 > 0);
 
+    _burn(address(this), liquidity);
+    _safeTransfer(_token0, to, amount0);
+    _safeTransfer(_token1, to, amount1);
+
+    balance0 = IERC20(_token0).balanceOf(address(this));
+    balance1 = IERC20(_token1).balanceOf(address(this));
+
+    _update(balance0, balance1, _reserve0, _reserve1);
+    emit Burn(msg.sender, amount0, amount1, to);
+  }
+
+  function swap(uint amount0Out, uint amount1Out, address to) external lock {
+    require(amount0Out > 0 || amount1Out > 0);
+    (uint112 _reserve0, uint112 _reserve1,) = getReserves();
+    require(amount0Out < _reserve0 && amount1Out < _reserve1);
+
+    uint balance0;
+    uint balance1;
+    {
+      address _token0 = token0;
+      address _token1 = token1;
+      require(to != _token0 && to != _token1);
+
+      // token0이 출금되어야(token1이 입금된)하는 경우
+      if (amount0Out > 0) _safeTransfer(_token0, to, amount0Out);
+      // token1이 출금되어야(token0이 입금된)하는 경우
+      if (amount1Out > 0) _safeTransfer(_token1, to, amount1Out);
+
+      // 둘 중 하나는 나갔을테니, 그 balance를 가져오자
+      balance0 = IERC20(_token0).balanceOf(address(this));
+      balance1 = IERC20(_token1).balanceOf(address(this));
+    }
+
+    // token0이 나갔으면 token1이, token1이 나갔으면 token0이 들어오겠지? 여기선 그 양을 계산해준다.
+    uint amount0In = balance0 > _reserve0 - amount0Out ? balance0 - (_reserve0 - amount0Out) : 0;
+    uint amount1In = balance1 > _reserve1 - amount1Out ? balance1 - (_reserve1 - amount1Out) : 0;
+    require(amount0in > 0 || amount1In > 0);
+
+    {
+      // 수수료 0.3%를 제한 금액을 구하여 require문으로 수수료를 지불할 수 있는지 여부를 확인한다.
+      uint balance0Adjusted = balance0.mul(1000).sub(amount0In.mul(3));
+      uint balance1Adjusted = balance1.mul(1000).sub(amount1In.mul(3));
+      require(balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(1000**2));
+
+    }
   }
 }
 
