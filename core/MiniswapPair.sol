@@ -187,7 +187,20 @@ contract MiniswapPair is IMiniswapPair, MiniswapERC20 {
       uint balance1Adjusted = balance1.mul(1000).sub(amount1In.mul(3));
       require(balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(1000**2));
 
+      _update(balance0, balance1, _reserve0, _reserve1);
+      emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
     }
+  }
+
+  function skim(address to) external lock {
+    address _token0 = token0;
+    address _token1 = token1;
+    _safeTransfer(_token0, to, IERC20(_token0).balanceOf(address(this)).sub(reserve0));
+    _safeTransfer(_token1, to, IERC20(_token1).balanceOf(address(this)).sub(reserve1));
+  }
+
+  function sync() external lock {
+    _update(IERC20(token0).balanceOf(address(this)), IERC20(token1).balanceOf(address(this)), reserve0, reserve1);
   }
 }
 
