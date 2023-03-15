@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import "./MiniswapLibrary.sol";
+import "../interfaces/MiniswapFactory.sol";
+import "../libraries/TransferHelper.sol";
+
+import "../interfaces/IMiniswapRouter.sol";
+import "../interfaces/IERC20.sol";
+
+import "../libraries/MiniswapLibrary.sol";
+import "../libraries/SafeMath.sol";
 
 contract MiniswapRouter {
     using SafeMath for uint;

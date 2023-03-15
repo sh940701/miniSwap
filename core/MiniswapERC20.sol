@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-contract MiniswapERC20 {
+import "../interfaces/IMiniswapERC20.sol";
+import "../libraries/SafeMath.sol";
+
+contract MiniswapERC20 is IMiniswapERC20 {
     using SafeMath for uint;
 
     string public constant name = "Miniswap";
