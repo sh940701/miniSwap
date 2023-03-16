@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+pragma solidity =0.6.6;
 
-import "../interfaces/MiniswapFactory.sol";
+import "../interfaces/IMiniswapFactory.sol";
 import "../libraries/TransferHelper.sol";
 
-import "../interfaces/IMiniswapRouter.sol";
 import "../interfaces/IERC20.sol";
 
 import "../libraries/MiniswapLibrary.sol";
@@ -15,7 +14,7 @@ contract MiniswapRouter {
 
     address public factory;
 
-    constructor(address _factory) {
+    constructor(address _factory) public {
         factory = _factory;
     }
 
@@ -29,6 +28,14 @@ contract MiniswapRouter {
     ) internal returns (uint amountA, uint amountB) {
         // 유동성을 추가할 때, 이전에 pair가 존재하지 않는 경우
         if (IMiniswapFactory(factory).getPair(tokenA, tokenB) == address(0)) {
+            IMiniswapFactory(factory).createPair(tokenA, tokenB);
+        }
+        (uint reserveA, uint reserveB) = MiniswapLibrary.getReserves(
+            factory,
+            tokenA,
+            tokenB
+        );
+        if (reserveA == 0 && reserveB == 0) {
             (amountA, amountB) = (amountADesired, amountBDesired);
         } else {
             // amountA, amountB토큰 입금 희망량을 기준으로 이상적인 상대 토큰 입금량 계산
@@ -38,9 +45,9 @@ contract MiniswapRouter {
                 reserveB
             );
             // 입금하고자 하는 양보다 입금에 필요한 양이 적을 때
-            if (amountBOptomal <= amountBDesired) {
+            if (amountBOptimal <= amountBDesired) {
                 // 최소 기준치보다는 입금량이 커야함
-                require(amountBOptimal >= amoountBMin);
+                require(amountBOptimal >= amountBMin, "router 1 error");
                 (amountA, amountB) = (amountADesired, amountBOptimal);
                 // 입금하고자 하는 양보다 입금에 필요한 양이 클 때는 반대로 계산하여 주어진 자산 내에서 동작하도록 한다.
             } else {
@@ -50,7 +57,7 @@ contract MiniswapRouter {
                     reserveA
                 );
                 assert(amountAOptimal <= amountADesired);
-                require(amountAOptimal >= amountAMin);
+                require(amountAOptimal >= amountAMin, "router 2 error");
                 (amountA, amountB) = (amountAOptimal, amountBDesired);
             }
         }
@@ -96,26 +103,30 @@ contract MiniswapRouter {
         (amountA, amountB) = tokenA == token0
             ? (amount0, amount1)
             : (amount1, amount0);
-        require(amountA >= amountAMin && amountB >= amountBMin);
+        require(
+            amountA >= amountAMin && amountB >= amountBMin,
+            "router 3 error"
+        );
     }
 
     function _swap(
         uint[] memory amounts,
         address[] memory path,
         address _to
-    ) internal {
-        (address input, address output) = (path[0], path[1]);
-        (address token0, ) = MiniswapLibrary.sortTokens(input, output);
-        uint amountOut = amounts[1];
-        (uint amount0Out, uint amount1Out) = input == token0
-            ? (uint(0), amountOut)
-            : (amountOut, uint(0));
-        IMiniswapPair(MiniswapLibrary.pairFor(factory, input, output)).swap(
-            amount0Out,
-            amount1Out,
-            to,
-            new bytes(0)
-        );
+    ) internal virtual {
+        for (uint i; i < path.length - 1; i++) {
+            (address input, address output) = (path[i], path[i + 1]);
+            (address token0, ) = IMiniswapLibrary.sortTokens(input, output);
+            uint amountOut = amounts[i + 1];
+            (uint amount0Out, uint amount1Out) = input == token0
+                ? (uint(0), amountOut)
+                : (amountOut, uint(0));
+            address to = i < path.length - 2
+                ? IMiniswapLibrary.pairFor(factory, output, path[i + 2])
+                : _to;
+            IMiniswapPair(MiniswapLibrary.pairFor(factory, input, output))
+                .swap(amount0Out, amount1Out, to, new bytes(0));
+        }
     }
 
     // 입금할 양이 정해졌을 때 출금될 양을 정해 swap해주는 함수
@@ -123,15 +134,14 @@ contract MiniswapRouter {
         uint amountIn,
         uint amountOutMin,
         address[] calldata path,
-        address to,
-        uint deadline
+        address to
     ) external returns (uint[] memory amounts) {
-        amounts = MiniswapV2Library.getAmountsOut(factory, amountIn, path);
-        require(amounts[amounts.length - 1] >= amountOutMin);
+        amounts = MiniswapLibrary.getAmountsOut(factory, amountIn, path);
+        require(amounts[amounts.length - 1] >= amountOutMin, "router 4 error");
         TransferHelper.safeTransferFrom(
             path[0],
             msg.sender,
-            UniswapV2Library.pairFor(factory, path[0], path[1]),
+            MiniswapLibrary.pairFor(factory, path[0], path[1]),
             amounts[0]
         );
         _swap(amounts, path, to);
@@ -145,7 +155,7 @@ contract MiniswapRouter {
         address to
     ) external returns (uint[] memory amounts) {
         amounts = MiniswapLibrary.getAmountsIn(factory, amountOut, path);
-        require(amounts[0] <= amountInMax);
+        require(amounts[0] <= amountInMax, "router 5 error");
         TransferHelper.safeTransferFrom(
             path[0],
             msg.sender,

@@ -1,31 +1,31 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+pragma solidity = 0.6.6;
 
 import "../interfaces/IMiniswapFactory.sol";
 import "./MiniswapPair.sol";
 
 contract Factory is IMiniswapFactory {
     // token pair들을 저장하는 mapping
-    mapping(address => mapping(address => address)) public getPair;
+    mapping(address => mapping(address => address)) public override getPair;
     // token pair 컨트랙트 주소를 저장하는 array
-    address[] public allPairs;
+    address[] public override allPairs;
 
     // pair 생성시 발생하는 이벤트, 이를 통해 온체인 이벤트를 트래킹할 수 있다.
     event PairCreated(
         address indexed token0,
         address indexed token1,
-        addres pair,
+        address pair,
         uint
     );
 
     // 원래는 배포시에 _feeTo 주소를 세팅해주지만 프로토콜 피 기능을 구현하지 않을 것이기 때문에 설정하지 않음
-    constructor() {}
+    constructor() public {}
 
     // 페어를 생성하는 함수
     function createPair(
         address tokenA,
         address tokenB
-    ) external returns (address pair) {
+    ) external override returns (address pair) {
         // 페어로 추가하고자 하는 토큰은 같은 토큰일 수 없다.
         require(tokenA != tokenB, "same token can't be pair");
 
@@ -42,7 +42,7 @@ contract Factory is IMiniswapFactory {
         // pair 컨트랙트의 바이트코드를 가져와 변수에 담아준다.
         bytes memory bytecode = type(MiniswapPair).creationCode;
         // token0, token1의 abi 값을 가져다가 해싱하여 salt값으로 삼는다.
-        bytes32 salt = keccak256((abi.encodePacked(token0, token1)));
+        bytes32 salt = keccak256(abi.encodePacked(token0, token1));
         // create2 를 사용하여 새로운 pair pool 컨트랙트를 생성한다.
         // create 함수는 nonce값을 사용하기 때문에 주소를 예측할 수 없어 트랜잭션이 컨펌된 후에나 알 수 있다.
         // 그러나 create2 는 컨트랙트 주소, salt값, 생성될 컨트랙트의 바이트코드를 사용해 주소를 계산할 수 있기 때문에

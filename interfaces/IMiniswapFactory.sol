@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.5.0;
 
 interface IMiniswapFactory {
@@ -8,10 +9,6 @@ interface IMiniswapFactory {
         uint
     );
 
-    function feeTo() external view returns (address);
-
-    function feeToSetter() external view returns (address);
-
     function getPair(
         address tokenA,
         address tokenB
@@ -19,14 +16,8 @@ interface IMiniswapFactory {
 
     function allPairs(uint) external view returns (address pair);
 
-    function allPairsLength() external view returns (uint);
-
     function createPair(
         address tokenA,
         address tokenB
     ) external returns (address pair);
-
-    function setFeeTo(address) external;
-
-    function setFeeToSetter(address) external;
 }

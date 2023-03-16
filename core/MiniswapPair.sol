@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+pragma solidity = 0.6.6;
 
 import "../interfaces/IMiniswapPair.sol";
 import "./MiniswapERC20.sol";
@@ -7,9 +7,8 @@ import "../libraries/Math.sol";
 import "../libraries/UQ112x112.sol";
 import "../interfaces/IERC20.sol";
 import "../interfaces/IMiniswapFactory.sol";
-import "./interfaces/IUniswapV2Callee.sol";
 
-contract MiniswapPair is IMiniswapPair, MiniswapERC20 {
+contract MiniswapPair is MiniswapERC20 {
     // 숫자를 사용하는 라이브러리들 using 선언
     using SafeMath for uint;
     // 112x112는 TWAP을 위한 data 저장에 사용된다.
@@ -63,10 +62,10 @@ contract MiniswapPair is IMiniswapPair, MiniswapERC20 {
         // ERC20토큰의 전송 함수인 transfer을 selector로 하여 해당 토큰을 to 주소로 value 만큼 transfer한다.
         (bool success, bytes memory data) = token.call(
             abi.encodeWithSelector(
-                bytes4(keccak256(bytes("transfer(address,uint256)")))
-            ),
-            to,
-            value
+                bytes4(keccak256(bytes("transfer(address,uint256)"))),
+                to,
+                value
+            )
         );
         // 이 때 각 ERC20 토큰의 transfer 구조가 다르기때문에, false인 경우, success && 아무것도 오지 않는 경우, true && 반환 데이터가 false인 경우를 모두 고려하여
         // 해당되지 않는 경우에만 전송에 성공한 것으로 간주한다.
@@ -76,6 +75,18 @@ contract MiniswapPair is IMiniswapPair, MiniswapERC20 {
             "Tx Failed"
         );
     }
+
+    event Mint(address indexed sender, uint amount0, uint amount1);
+    event Burn(address indexed sender, uint amount0, uint amount1, address indexed to);
+    event Swap(
+        address indexed sender,
+        uint amount0In,
+        uint amount1In,
+        uint amount0Out,
+        uint amount1Out,
+        address indexed to
+    );
+    event Sync(uint112 reserve0, uint112 reserve1);
 
     constructor() public {
         // pair 컨트랙트를 배포한 factory 컨트랙트의 주소값을 초기화 해준다.
@@ -103,8 +114,7 @@ contract MiniswapPair is IMiniswapPair, MiniswapERC20 {
         // 결국 uint112(-1)은 112bit에서 나타낼 수 있는 가장 큰 수를 의미하게 된다.
         // 이를 통해 require에서는 overflow를 확인할 수 있게 된다.
         require(
-            balance0 <= uint112(-1) && balance1 <= uint112(-1),
-            "UniswapV2: OVERFLOW"
+            balance0 <= uint112(-1) && balance1 <= uint112(-1)
         );
 
         // 블록의 timestamp를 uint32에 맞추어 저장해준다.
@@ -146,15 +156,15 @@ contract MiniswapPair is IMiniswapPair, MiniswapERC20 {
 
         // 실제 토큰 양과 자료구조의 토큰양의 차이가 현재 풀에 입금된 토큰의 양이다.
         uint amount0 = balance0.sub(_reserve0);
-        uint amount1 = valance1.sub(_reserve1);
+        uint amount1 = balance1.sub(_reserve1);
 
         uint _totalSupply = totalSupply;
         // 총 공급량이 0일 때(처음 유동성을 공급하는 경우이다.)
-        if (_totalSupply = 0) {
+        if (_totalSupply == 0) {
             // 이 경우 liquidity는 두 토큰의 곱에 루트를 한 값에서 1000을 뺀 값이다.
             // 이에 대한 설명은 백서에 기재되어있다.
             liquidity = Math.sqrt(amount0.mul(amount1)).sub(10 ** 3);
-            _mint(adress(0), 10 ** 3);
+            _mint(address(0), 10 ** 3);
         } else {
             // 이미 풀이 존재할 때, liquidity는 각 토큰의 새로 공급한 양 / 기존 보유량 * 총 공급량 중 작은값이 된다.
             liquidity = Math.min(
@@ -185,7 +195,7 @@ contract MiniswapPair is IMiniswapPair, MiniswapERC20 {
         uint _totalSupply = totalSupply;
         amount0 = liquidity.mul(balance0) / _totalSupply;
         amount1 = liquidity.mul(balance1) / _totalSupply;
-        require(amount0 > 0 && amount1 > 0);
+        require(amount0 > 0 && amount1 > 0, "pair 1 error");
 
         _burn(address(this), liquidity);
         _safeTransfer(_token0, to, amount0);
@@ -199,9 +209,9 @@ contract MiniswapPair is IMiniswapPair, MiniswapERC20 {
     }
 
     function swap(uint amount0Out, uint amount1Out, address to) external lock {
-        require(amount0Out > 0 || amount1Out > 0);
+        require(amount0Out > 0 || amount1Out > 0, "pair 2 error");
         (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
-        require(amount0Out < _reserve0 && amount1Out < _reserve1);
+        require(amount0Out < _reserve0 && amount1Out < _reserve1, "pair 3 error");
 
         uint balance0;
         uint balance1;
@@ -227,7 +237,7 @@ contract MiniswapPair is IMiniswapPair, MiniswapERC20 {
         uint amount1In = balance1 > _reserve1 - amount1Out
             ? balance1 - (_reserve1 - amount1Out)
             : 0;
-        require(amount0in > 0 || amount1In > 0);
+        require(amount0In > 0 || amount1In > 0, "pair 4 error");
 
         {
             // 수수료 0.3%를 제한 금액을 구하여 require문으로 수수료를 지불할 수 있는지 여부를 확인한다.
@@ -235,7 +245,8 @@ contract MiniswapPair is IMiniswapPair, MiniswapERC20 {
             uint balance1Adjusted = balance1.mul(1000).sub(amount1In.mul(3));
             require(
                 balance0Adjusted.mul(balance1Adjusted) >=
-                    uint(_reserve0).mul(_reserve1).mul(1000 ** 2)
+                uint(_reserve0).mul(_reserve1).mul(1000 ** 2)
+                , "pair 5 error"
             );
 
             _update(balance0, balance1, _reserve0, _reserve1);

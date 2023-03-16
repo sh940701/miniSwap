@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+pragma solidity = 0.6.6;
 
 import "../interfaces/IMiniswapPair.sol";
 import "./SafeMath.sol";
@@ -12,11 +12,11 @@ library MiniswapLibrary {
         address tokenA,
         address tokenB
     ) internal pure returns (address token0, address token1) {
-        require(tokenA != tokenB);
+        require(tokenA != tokenB, "lib 1 error");
         (token0, token1) = tokenA < tokenB
             ? (tokenA, tokenB)
             : (tokenB, tokenA);
-        require(token0 != address(0));
+        require(token0 != address(0), "lib 2 error");
     }
 
     // pair contract의 주소를 계산해주는 함수. external call을 하는 것보다 가스비가 저렴하다고 한다.
@@ -33,7 +33,7 @@ library MiniswapLibrary {
                         hex"ff",
                         factory,
                         keccak256(abi.encodePacked(token0, token1)),
-                        hex"96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f"
+                        hex"ca299838fcf0f35a92dbdf9ce93b35240d44534fdb01021c11c400e3a0aa6b1e"
                     )
                 )
             )
@@ -62,7 +62,7 @@ library MiniswapLibrary {
         uint reserveA,
         uint reserveB
     ) internal pure returns (uint amountB) {
-        require(amountA > 0 && reserveA > 0 && reserveB > 0);
+        require(amountA > 0 && reserveA > 0 && reserveB > 0, "lib 3 error");
         amountB = amountA.mul(reserveB) / reserveA;
     }
 
@@ -72,7 +72,7 @@ library MiniswapLibrary {
         uint reserveIn,
         uint reserveOut
     ) internal pure returns (uint amountOut) {
-        require(amountIn > 0 && reserveIn > 0 && reserveOut > 0);
+        require(amountIn > 0 && reserveIn > 0 && reserveOut > 0, "lib 4 error");
         uint amountInWithFee = amountIn.mul(997);
         uint numerator = amountInWithFee.mul(reserveOut);
         uint denominator = reserveIn.mul(1000).add(amountInWithFee);
@@ -85,7 +85,7 @@ library MiniswapLibrary {
         uint reserveIn,
         uint reserveOut
     ) internal pure returns (uint amountIn) {
-        require(amountOut > 0 && reserveIn > 0 && reserveOut > 0);
+        require(amountOut > 0 && reserveIn > 0 && reserveOut > 0, "lib 5 error");
         uint numerator = reserveIn.mul(amountOut).mul(1000);
         uint denominator = reserveOut.sub(amountOut).mul(997);
         amountIn = (numerator / denominator).add(1);
@@ -96,7 +96,7 @@ library MiniswapLibrary {
         uint amountIn,
         address[] memory path
     ) internal view returns (uint[] memory amounts) {
-        require(path.length >= 2);
+        require(path.length >= 2, "lib 6 error");
         amounts = new uint[](path.length);
         amounts[0] = amountIn;
         for (uint i; i < path.length - 1; i++) {
@@ -114,7 +114,7 @@ library MiniswapLibrary {
         uint amountOut,
         address[] memory path
     ) internal view returns (uint[] memory amounts) {
-        require(path.length >= 2);
+        require(path.length >= 2, "lib 7 error");
         amounts = new uint[](path.length);
         amounts[amounts.length - 1] = amountOut;
         for (uint i = path.length - 1; i > 0; i--) {
