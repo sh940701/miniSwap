@@ -116,13 +116,13 @@ contract MiniswapRouter {
     ) internal virtual {
         for (uint i; i < path.length - 1; i++) {
             (address input, address output) = (path[i], path[i + 1]);
-            (address token0, ) = IMiniswapLibrary.sortTokens(input, output);
+            (address token0, ) = MiniswapLibrary.sortTokens(input, output);
             uint amountOut = amounts[i + 1];
             (uint amount0Out, uint amount1Out) = input == token0
                 ? (uint(0), amountOut)
                 : (amountOut, uint(0));
             address to = i < path.length - 2
-                ? IMiniswapLibrary.pairFor(factory, output, path[i + 2])
+                ? MiniswapLibrary.pairFor(factory, output, path[i + 2])
                 : _to;
             IMiniswapPair(MiniswapLibrary.pairFor(factory, input, output))
                 .swap(amount0Out, amount1Out, to, new bytes(0));
